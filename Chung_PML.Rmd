@@ -1,0 +1,168 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "by H. Chung"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Project Background
+Using devices such as *Jawbone Up*, *Nike Fuelband*, and *Fitbit*, it is now possible to collect huge amounts of personal activity data inexpensively. These devices are part of the quantified self movement, or a group of enthusiasts who take measurements about themselves on a regular basis to improve their health, find behavioral patterns of themselves, or they are just tech geeks. The common activity that people do is to quantify *how much* of a particular activity they do, but *rarely quantify how well they do it*. 
+
+In this project, the goal is to use obtained data from accelerometers from the belt, forearm, arm, and dumbbell of six (6) participants. Each participant was tasked to perform barbell lifts correctly and incorrectly in five (5) different ways. Further information about the activity is found on the **Weight Lifting Exercise Dataset** in [this website](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har).
+
+# Data Loading and Exploration
+The datasets to be used for this project are as following: 
+
+* [Training Dataset](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv) - *pml-training.csv*
+* [Testing Dataset](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv) - *pml-testing.csv*
+
+After downloading the csv files to be used for this project, we then load these datasets on RStudio using the code below. We also load the different packages that we will be using throughout the course of making the project. 
+
+*Note: The packages to be used should already be installed prior to loading them. If they have not yet been installed, use the code **install.packages('*insert package name*')** *.
+
+```{r, message = FALSE}
+# Loading Packages
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(corrplot)
+library(e1071)
+library(randomForest)
+library(gbm)
+
+# Loading Data
+data_train <- read.csv('pml-training.csv')
+data_test <- read.csv('pml-testing.csv')
+```
+
+Once the data has been loaded, we now look into the dimensions and how it looks like.
+```{r}
+dim(data_train)
+dim(data_test)
+
+names(data_train)
+```
+
+From the dimensions generated, we can see that the *training dataset has 19622 observations and 160 variables* while the *testing dataset has 20 observations and 160 variables*.
+
+### Data Cleaning 
+Based from the column names shown, the first 7 variables may already be removed as they are independent and have no impact on predicting the target outcome (**classe**). 
+```{r}
+data_train <- data_train[,-c(1:7)]
+data_test <- data_test[,-c(1:7)]
+```
+
+The next thing that we will do is to check for missing values from the variables and remove them from our datasets. 
+```{r}
+data_train <- data_train[, colSums(is.na(data_train)) == 0]
+data_test <- data_test[, colSums(is.na(data_test)) == 0]
+
+dim(data_train)
+dim(data_test)
+```
+We can see now that we have reduced the number of variables to 86 and 53 for training and testing datasets, respectively. 
+
+### Data Preparation
+Prior to modeling, we first separate our training dataset into two (2) to create a *Training Set*, with 70% of data_train, and a *Validation Set*, with 30% of data_train. The Testing Dataset will not be separated as it will only be used for the generation of results.
+```{r}
+set.seed(1234) # so partitioning is consistent 
+
+data_separation <- createDataPartition(data_train$classe, p = 0.7, list = FALSE)
+data_train <- data_train[data_separation, ]
+data_validate <- data_train[-data_separation, ]
+
+dim(data_train)
+dim(data_validate)
+```
+We proceed now to removing variables that have **near zero variance**.
+```{r}
+nzv <- nearZeroVar(data_train)
+data_train <- data_train[, -nzv]
+data_validate <- data_validate[, -nzv]
+
+dim(data_train)
+dim(data_validate)
+```
+Now, we are down to 53 variables for all datasets (Train, Validate, and Test).
+
+### Correlation Analysis
+A correlation among variables is analysed before proceeding to the modeling procedures. This is to lessen the variables further by identifying variables which are highly similar (correlated) to each other.
+```{r}
+corMatrix <- cor(data_train[, -53])
+corrplot(corMatrix, order = "FPC", method = "color", type = "lower", tl.cex = 0.8, tl.col = rgb(0, 0, 0))
+```
+
+The correlation plot above shows which variables are highly correlated (the dark the color, the more correlated). However, in order to find out the names of these variables, we use the code below, and we set our correlation cutoff at 0.75. 
+```{r}
+correlated <- findCorrelation(corMatrix, cutoff = 0.75)
+names(data_train)[correlated]
+```
+# Model Building
+Three methods will be applied to model the regressions (in the Train dataset) and the best one (with higher accuracy when applied to the Test dataset) will be used for the quiz predictions. The methods are: Random Forests, Gradient Boost Method, and Decision Tree Classifier. A Confusion Matrix is plotted at the end of each analysis to better visualize the accuracy of the models.
+
+### 1. Random Forest 
+```{r}
+set.seed(12345)
+controlRF <- trainControl(method = 'cv', number = 3, verboseIter = FALSE)
+modelfitRF <- train(classe ~., data = data_train, method = 'rf', trControl = controlRF)
+
+modelfitRF$finalModel
+```
+We then validate the model using data_validate to find out how well it performs by looking at the Accuracy.
+```{r}
+predictRF <- predict(modelfitRF, newdata = data_validate)
+confMatrixRF <- confusionMatrix(predictRF, data_validate$classe)
+confMatrixRF
+```
+
+The **accuracy rate** of Random Forest is **1** 
+
+### 2. Gradient Boosting Method
+```{r}
+set.seed(12345)
+controlGBM <- trainControl(method = "repeatedcv", number = 5, repeats = 1)
+modelfitGBM  <- train(classe ~ ., data = data_train, method = "gbm", trControl = controlGBM, verbose = FALSE)
+print(modelfitGBM)
+modelfitGBM$finalModel
+```
+
+We then validate the model using data_validate to find out how well it performs by looking at the Accuracy.
+```{r}
+predictGBM <- predict(modelfitGBM, newdata = data_validate)
+confMatrixGBM <- confusionMatrix(predictGBM, data_validate$classe)
+confMatrixGBM
+```
+The **accuracy rate** of the Gradient Boosting Method is **0.9736** 
+
+### 3. Decision Tree Classifier
+```{r}
+set.seed(12345)
+modelDT <- rpart(classe ~., data = data_train, method = 'class')
+fancyRpartPlot(modelDT)
+```
+
+We then validate the model using data_validate to find out how well it performs by looking at the Accuracy.
+```{r}
+predictDT <- predict(modelDT, data_validate, type = 'class')
+confMatrixDT <- confusionMatrix(predictDT, data_validate$classe)
+confMatrixDT
+```
+The **accuracy rate** of the Decision Tree Classifier is **0.6967** 
+
+# Final Model Selection and Conclusion
+Using the accuracy rates we have obtained from the three (3) different predictive models (see summary below), the final model selected is the Random Forest. 
+
+1. Random Forest: 1
+2. Gradient Boosting Method: 0.9736
+3. Decision Trees: 0.6967
+
+Hence, we now use it on our Test Dataset.
+```{r}
+FinalModelResult <- predict(modelfitRF, newdata = data_test)
+FinalModelResult
+```
