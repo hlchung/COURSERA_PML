@@ -120,7 +120,7 @@ confMatrixRF <- confusionMatrix(predictRF, data_validate$classe)
 confMatrixRF
 ```
 
-The **accuracy rate** of Random Forest is **1** 
+The **accuracy rate** of Random Forest is **1** and out of sample error is 0.
 
 ### 2. Gradient Boosting Method
 ```{r}
@@ -137,7 +137,7 @@ predictGBM <- predict(modelfitGBM, newdata = data_validate)
 confMatrixGBM <- confusionMatrix(predictGBM, data_validate$classe)
 confMatrixGBM
 ```
-The **accuracy rate** of the Gradient Boosting Method is **0.9736** 
+The **accuracy rate** of the Gradient Boosting Method is **0.9736** and out of sample error is 0.0264.
 
 ### 3. Decision Tree Classifier
 ```{r}
@@ -152,7 +152,7 @@ predictDT <- predict(modelDT, data_validate, type = 'class')
 confMatrixDT <- confusionMatrix(predictDT, data_validate$classe)
 confMatrixDT
 ```
-The **accuracy rate** of the Decision Tree Classifier is **0.6967** 
+The **accuracy rate** of the Decision Tree Classifier is **0.6967** and out of sample error is 0.3033.
 
 # Final Model Selection and Conclusion
 Using the accuracy rates we have obtained from the three (3) different predictive models (see summary below), the final model selected is the Random Forest. 
